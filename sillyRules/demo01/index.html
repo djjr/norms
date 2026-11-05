@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silly Rules: a learning simulation</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --surface-2: #efeeea;
+    --border: #dcdad3;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77756f;
+    --grid: #e6e4de;
+    --accent: #2a78d6;
+    --s-none: #8f8d86;
+    --s-important: #2a78d6;
+    --s-silly: #eb6834;
+    --mark: #e34948;
+    --world-bg: #f7f6f2;
+    --agent: #1f1f1d;
+    --agent-sick: #b9b7af;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #232321;
+      --border: #34332f; --text-primary: #f0efec; --text-secondary: #c3c2b7;
+      --text-muted: #96958c; --grid: #2c2b28; --accent: #3987e5;
+      --s-none: #8a8984; --s-important: #3987e5; --s-silly: #d95926;
+      --mark: #e66767; --world-bg: #1f1f1d; --agent: #f0efec; --agent-sick: #5d5c57;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface-0); color: var(--text-primary);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  .lede { color: var(--text-secondary); max-width: 820px; margin: 0 0 4px; }
+  .cite { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+  .panel {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 16px;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; }
+  .ctl { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+  .ctl output { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  button, select {
+    font: inherit; font-size: 14px; color: var(--text-primary);
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 6px 12px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=range] { width: 150px; accent-color: var(--accent); }
+  .worlds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 860px) { .worlds { grid-template-columns: 1fr; } }
+  .world h3 { margin: 0 0 2px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .world .rule { font-size: 13px; color: var(--text-muted); margin: 0 0 6px; min-height: 20px; }
+  .world canvas { width: 100%; height: auto; border-radius: 6px; background: var(--world-bg); display: block; cursor: pointer; }
+  .wstats { font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--text-secondary); margin-top: 12px; }
+  .key span { display: inline-flex; align-items: center; gap: 6px; }
+  .berry-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 980px) { .charts { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .charts { grid-template-columns: 1fr; } }
+  .chart { position: relative; }
+  .chart .ct { font-size: 13.5px; font-weight: 600; margin: 0; }
+  .chart .cs { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; }
+  .chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+    font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; white-space: nowrap;
+    font-variant-numeric: tabular-nums; z-index: 5;
+  }
+  .legend { display: flex; gap: 16px; font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 2px; display: inline-block; border-radius: 1px; }
+  .mode { font-size: 13px; color: var(--text-secondary); }
+  .progress { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; width: 180px; }
+  .progress div { height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+  .two { display: grid; grid-template-columns: 1.1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+  .inspector #inspector { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 0 28px; }
+  .inspector #inspector > p:first-child { grid-column: 1 / -1; }
+  .inspector .bars { display: grid; grid-template-columns: 90px 1fr 44px; gap: 4px 8px; align-items: center; font-size: 12.5px; }
+  .bar-track { height: 10px; background: var(--surface-2); border-radius: 3px; position: relative; overflow: hidden; }
+  .bar-zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--text-muted); }
+  .bar-fill { position: absolute; top: 1px; bottom: 1px; border-radius: 2px; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; color: var(--text-secondary); }
+  .muted { color: var(--text-muted); }
+  ol.try { margin: 0; padding-left: 20px; }
+  ol.try li { margin-bottom: 8px; }
+  code { font-size: 13px; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+  .note { font-size: 13px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Silly rules: why pointless taboos can help a group</h1>
+  <p class="lede">Eight learning agents forage for berries. Pink berries are poisonous, but the harm shows up long after eating, so no agent can tell which berry caused it.
+  A taboo means that anyone who breaks it gets marked, the mark is visible only to <em>others</em>, and others are rewarded for punishing marked agents.
+  The question: does adding a second, <em>harmless</em> taboo (teal) help or hurt?</p>
+  <p class="cite">A simplified, inspectable model of Köster, Hadfield-Menell, Everett, Weidinger, Hadfield &amp; Leibo (2022), “Spurious normativity enhances learning of compliance and enforcement behavior in artificial agents,” <em>PNAS</em> 119(3). Not deep RL: each agent learns a handful of numbers you can inspect.</p>
+
+  <section class="panel">
+    <div class="controls">
+      <button id="play" class="primary">▶ Play</button>
+      <button id="reset">New run</button>
+      <label class="ctl">Speed
+        <select id="speed">
+          <option value="1">Watch (slow)</option>
+          <option value="6" selected>Watch</option>
+          <option value="60">Fast</option>
+          <option value="0">Fastest (skip drawing)</option>
+        </select>
+      </label>
+      <label class="ctl">Enforcement skill
+        <select id="transfer">
+          <option value="true" selected>Shared across all norms</option>
+          <option value="false">Separate for each norm</option>
+        </select>
+      </label>
+      <label class="ctl">Cost of punishing <output id="zapCostOut">20</output>
+        <input id="zapCost" type="range" min="0" max="40" step="5" value="20">
+      </label>
+      <label class="ctl">Poison delay (steps) <output id="delayOut">100</output>
+        <input id="delay" type="range" min="0" max="150" step="10" value="100">
+      </label>
+    </div>
+    <p class="note" style="margin:10px 0 0">Changing a setting starts a new run. All three worlds use the same random seed, so they differ only in their rules.</p>
+  </section>
+
+  <section class="panel">
+    <div class="worlds" id="worlds"></div>
+    <div class="key">
+      <span><span class="berry-dot" style="background:#e87ba4"></span>pink: poisonous</span>
+      <span><span class="berry-dot" style="background:#1baf7a"></span>teal: harmless (taboo in “silly rule” only)</span>
+      <span><span class="berry-dot" style="background:#eda100"></span><span class="berry-dot" style="background:#6250d6"></span><span class="berry-dot" style="background:#3f9a3f"></span><span class="berry-dot" style="background:#a0785a"></span>other berries: harmless</span>
+      <span><svg width="14" height="14"><circle cx="7" cy="7" r="4.5" fill="var(--agent)" stroke="var(--mark)" stroke-width="2"/></svg>marked (seen only by others)</span>
+      <span><svg width="14" height="14"><circle cx="7" cy="7" r="4.5" fill="var(--agent-sick)"/></svg>poisoned (only you can see this)</span>
+      <span><svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="var(--mark)" stroke-width="2"/></svg>zap</span>
+      <span class="muted">Click an agent to inspect what it has learned.</span>
+    </div>
+  </section>
+
+  <section class="panel inspector" id="inspectorPanel">
+    <h2>Inside one agent</h2>
+    <div id="inspector"><p class="muted">Click an agent (a larger dark circle) in any world. Pausing first makes it easier.</p></div>
+  </section>
+
+  <section class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+      <h2 style="margin:0">Learning curves <span class="mode" id="modeLabel">(this run, 5-episode moving average)</span></h2>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="ctl" style="flex-direction:row;align-items:center;gap:6px">Populations per rule
+          <select id="nPop"><option>4</option><option>8</option><option selected>12</option><option>20</option></select>
+        </label>
+        <button id="experiment">Run experiment (30 episodes)</button>
+        <div class="progress" id="progress" style="display:none"><div></div></div>
+        <button id="showLive" style="display:none">Back to this run</button>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="charts" id="charts"></div>
+    <p class="note" id="expNote" style="display:none;margin:12px 0 0"></p>
+  </section>
+
+  <div>
+    <section class="panel">
+      <h2>Things to try</h2>
+      <ol class="try">
+        <li><b>Watch the order.</b> In the rule worlds, the number of violators punished rises <em>before</em> time spent poisoned falls. The group learns to enforce first, and only then do individuals learn to comply.</li>
+        <li><b>Run the experiment.</b> A single run is noisy. Averaged over populations, look at episodes 3–12: silly-rule worlds build enforcement skill faster and get out of the poison sooner, because twice as many violations means twice the practice. Then look at group return: the silly rule's early punishment spike costs points, and in this model the payback is real but modest. That matches the paper, where the welfare advantage was confined to a middle stretch of training.</li>
+        <li><b>Test the mechanism.</b> Set enforcement skill to <em>separate for each norm</em> and rerun the experiment. Practice on teal no longer helps with pink, and the silly rule loses its advantage.</li>
+        <li><b>Price the punishment.</b> Faster compliance comes at a cost: more punishments, each costing the group points. Make punishment cheap (a raised eyebrow) or expensive (a duel) and watch whether the silly rule pays for itself.</li>
+        <li><b>Remove the credit-assignment problem.</b> Set the poison delay near 0. Now agents can work out by themselves which berry made them sick, and the no-rules world learns on its own. Norms matter when consequences are delayed and causes are unclear.</li>
+      </ol>
+    </section>
+  </div>
+</main>
+
+<script>
+// Silly Rules simulation engine
+// A deliberately simple, inspectable model of Köster et al. (2022, PNAS).
+// Not deep RL: each agent learns a handful of numbers, so students can see
+// exactly WHAT is being learned and WHY the silly rule helps.
+//
+// What each agent learns:
+//   Q[c]   compliance values, one PER BERRY COLOR (norm-specific)
+//   Vm, Vu value of chasing a MARKED / UNMARKED agent (discrimination)
+//   skill  enforcement skill: grows with practice. By default it is ONE
+//          number shared across all norms (the paper's key asymmetry).
+//          With transferSkill=false it is kept per norm instead.
+
+(function (root) {
+  const DEFAULTS = {
+    width: 24, height: 16, nAgents: 8, nBerries: 90, nColors: 6,
+    episodeLength: 1000,
+    poisonDelay: 100,         // steps between eating pink and feeling it
+    sicknessSignal: 35,       // how bad 'feeling sick' is when it arrives
+    berryReward: 4, poisonedReward: 1,
+    zapCost: 20, zapPenalty: 35, bounty: 35,
+    viewRadius: 8, beamRange: 2, maxChase: 12,
+    learningRate: 0.05,       // compliance learning rate
+    socialLearningRate: 0.05, // learning rate for Vm / Vu
+    creditDecay: 4,           // how fast blame fades with delay (steps)
+    choiceTemp: 1.0, distCost: 0.35,
+    stepCost: 0.8,            // opportunity cost of one step spent chasing
+    skillMin: 0.05, skillMax: 0.9, skillPractice: 120, skillWidth: 15,
+    socialTemp: 2, socialFloor: 0.002,
+    regrowProb: 0.08,
+    eatTime: 4,               // steps spent eating (handling time)
+    initSocialValue: -10,     // agents start reluctant to chase anyone
+    transferSkill: true,
+  };
+
+  const TABOO = { none: [], important: [0], silly: [0, 1] };
+  const POISON = 0; // color 0 (pink) is poisonous
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+  const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
+
+  function createSim(condition, seed, overrides) {
+    const P = Object.assign({}, DEFAULTS, overrides || {});
+    const rand = mulberry32(seed >>> 0);
+    const taboo = new Set(TABOO[condition]);
+    const randInt = (n) => Math.floor(rand() * n);
+
+    // ---- agents: learned state persists across episodes ----
+    const agents = [];
+    for (let i = 0; i < P.nAgents; i++) {
+      agents.push({
+        id: i, x: 0, y: 0,
+        Q: Array.from({ length: P.nColors }, () => 3 + rand() * 0.2),
+        Vm: P.initSocialValue, Vu: P.initSocialValue,
+        busy: 0,
+        practice: 0,                                   // shared skill
+        practiceByNorm: new Array(P.nColors).fill(0),  // norm-specific skill
+        // per-episode state
+        marked: false, markColor: -1, poisonTimer: -1, poisoned: false,
+        trace: [], mode: 'forage', target: null, targetBerry: null,
+        chaseSteps: 0, chaseMarked: false, chaseColor: -1, chaseOutcome: 0,
+        flash: 0,
+      });
+    }
+
+    const berries = [];
+    for (let i = 0; i < P.nBerries; i++) {
+      berries.push({ x: 0, y: 0, color: i % P.nColors, alive: true });
+    }
+
+    const sim = {
+      P, condition, taboo, agents, berries,
+      t: 0, episode: 0,
+      history: [],          // one record per finished episode
+      ep: null,             // running per-episode metrics
+      zaps: [],             // recent zap lines for drawing
+    };
+
+    function skillOf(a, normColor) {
+      const n = P.transferSkill ? a.practice
+        : (normColor >= 0 ? a.practiceByNorm[normColor] : 0);
+      // S-shaped learning curve: clumsy until ~skillPractice attempts, then improves fast
+      return P.skillMin + (P.skillMax - P.skillMin) / (1 + Math.exp(-(n - P.skillPractice) / P.skillWidth));
+    }
+    sim.skillOf = skillOf;
+
+    function placeBerry(b) { b.x = randInt(P.width); b.y = randInt(P.height); b.alive = true; }
+
+    function resetEpisode() {
+      sim.t = 0;
+      for (const a of agents) {
+        a.x = randInt(P.width); a.y = randInt(P.height);
+        a.marked = false; a.markColor = -1; a.poisonTimer = -1; a.poisoned = false;
+        a.trace = []; a.busy = 0; a.mode = 'forage'; a.target = null; a.targetBerry = null;
+      }
+      for (const b of berries) placeBerry(b);
+      sim.ep = {
+        collective: 0, eaten: 0, chaseSteps: 0, poisonedSteps: 0, tabooEaten: 0, poisonEaten: 0,
+        sillyEaten: 0, punishDelay: 0, zapMarked: 0, zapUnmarked: 0, markedSteps: 0,
+      };
+      sim.zaps = [];
+    }
+
+    function moveToward(a, tx, ty, steps) {
+      for (let s = 0; s < steps; s++) {
+        a.x = Math.min(P.width - 1, Math.max(0, a.x + sign(tx - a.x)));
+        a.y = Math.min(P.height - 1, Math.max(0, a.y + sign(ty - a.y)));
+      }
+    }
+
+    // Blame recent meals for a punishment. Immediate punishment lands on the
+    // berry just eaten; delayed punishment is smeared over innocent berries.
+    function blameRecentMeals(a, magnitude) {
+      for (const e of a.trace) {
+        const w = Math.exp(-(sim.t - e.t) / P.creditDecay);
+        a.Q[e.c] += P.learningRate * w * (-magnitude);
+      }
+    }
+    const creditPunishment = (target) => blameRecentMeals(target, P.zapPenalty);
+
+    function eat(a, b) {
+      b.alive = false;
+      const r = a.poisoned ? P.poisonedReward : P.berryReward;
+      sim.ep.collective += r;
+      sim.ep.eaten++;
+      // ordinary reward learning: the berry tastes like r
+      a.Q[b.color] += P.learningRate * (r - a.Q[b.color]);
+      a.busy = P.eatTime;
+      a.trace.push({ c: b.color, t: sim.t });
+      if (a.trace.length > 20) a.trace.shift();
+      if (b.color === POISON) {
+        sim.ep.poisonEaten++;
+        if (!a.poisoned && a.poisonTimer < 0) a.poisonTimer = Math.max(1, P.poisonDelay);
+      }
+      if (taboo.has(b.color)) {
+        sim.ep.tabooEaten++;
+        if (b.color !== POISON) sim.ep.sillyEaten++;
+        a.marked = true; a.markColor = b.color; a.markTime = sim.t; // visible to others only
+      }
+    }
+
+    function endChase(a) {
+      const v = a.chaseMarked ? 'Vm' : 'Vu';
+      a[v] += P.socialLearningRate * (a.chaseOutcome - a[v]);
+      a.mode = 'forage'; a.target = null;
+    }
+
+    function stepChase(a) {
+      const tg = a.target;
+      // someone else already punished them: stop chasing
+      if (a.chaseMarked && !tg.marked) { endChase(a); stepForage(a); return; }
+      a.chaseSteps++;
+      sim.ep.chaseSteps++;
+      a.chaseOutcome -= P.stepCost;
+      const k = skillOf(a, a.chaseColor);
+      // skilled enforcers close distance faster (they cut corners)
+      moveToward(a, tg.x, tg.y, rand() < k ? 2 : 1);
+      if (cheb(a, tg) <= P.beamRange) {
+        if (a.chaseMarked) {
+          a.practice++;
+          if (a.chaseColor >= 0) a.practiceByNorm[a.chaseColor]++;
+        }
+        if (rand() < k) {
+          // hit
+          sim.ep.collective -= P.zapCost + P.zapPenalty;
+          a.chaseOutcome -= P.zapCost;
+          sim.zaps.push({ x1: a.x, y1: a.y, x2: tg.x, y2: tg.y, life: 6, marked: tg.marked });
+          if (tg.marked) {
+            sim.ep.collective += P.bounty;
+            a.chaseOutcome += P.bounty;
+            sim.ep.zapMarked++;
+            sim.ep.punishDelay += sim.t - tg.markTime;
+            tg.marked = false; tg.markColor = -1;
+          } else {
+            sim.ep.zapUnmarked++;
+          }
+          tg.flash = 6;
+          creditPunishment(tg);
+          endChase(a);
+          return;
+        }
+      }
+      if (a.chaseSteps >= P.maxChase) endChase(a);
+    }
+
+    function stepForage(a) {
+      // 1) social decision: chase the nearest visible agent?
+      let near = null, nd = 1e9;
+      for (const o of agents) {
+        if (o === a) continue;
+        const d = cheb(a, o);
+        if (d <= P.viewRadius && d < nd) { nd = d; near = o; }
+      }
+      if (near) {
+        const v = near.marked ? a.Vm : a.Vu;
+        const p = P.socialFloor + 0.3 * sigmoid(v / P.socialTemp);
+        if (rand() < p) {
+          a.mode = 'chase'; a.target = near; a.chaseSteps = 0;
+          a.chaseMarked = near.marked; a.chaseColor = near.markColor;
+          a.chaseOutcome = 0;
+          stepChase(a);
+          return;
+        }
+      }
+      // 2) forage: softmax over visible berries (plus 'wander')
+      if (!a.targetBerry || !a.targetBerry.alive) {
+        const opts = [], scores = [];
+        for (const b of berries) {
+          if (!b.alive) continue;
+          const d = cheb(a, b);
+          if (d > P.viewRadius) continue;
+          opts.push(b); scores.push(a.Q[b.color] - P.distCost * d);
+        }
+        opts.push(null); scores.push(0); // wander
+        let mx = -1e9; for (const s of scores) mx = Math.max(mx, s);
+        let z = 0; const w = scores.map((s) => { const e = Math.exp((s - mx) / P.choiceTemp); z += e; return e; });
+        let r = rand() * z, pick = opts.length - 1;
+        for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) { pick = i; break; } }
+        a.targetBerry = opts[pick];
+      }
+      if (a.targetBerry) {
+        moveToward(a, a.targetBerry.x, a.targetBerry.y, 1);
+        if (a.x === a.targetBerry.x && a.y === a.targetBerry.y) {
+          eat(a, a.targetBerry); a.targetBerry = null;
+        }
+      } else {
+        a.x = Math.min(P.width - 1, Math.max(0, a.x + randInt(3) - 1));
+        a.y = Math.min(P.height - 1, Math.max(0, a.y + randInt(3) - 1));
+      }
+    }
+
+    sim.step = function () {
+      // random update order
+      const order = agents.slice();
+      for (let i = order.length - 1; i > 0; i--) { const j = randInt(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+      for (const a of order) {
+        if (a.poisonTimer > 0 && --a.poisonTimer === 0) {
+          a.poisoned = true; a.poisonTimer = -1;
+          blameRecentMeals(a, P.sicknessSignal); // 'I feel sick' - but which berry?
+        }
+        if (a.poisoned) sim.ep.poisonedSteps++;
+        if (a.marked) sim.ep.markedSteps++;
+        if (a.flash > 0) a.flash--;
+        if (a.busy > 0) { a.busy--; continue; }
+        if (a.mode === 'chase') stepChase(a); else stepForage(a);
+      }
+      for (const b of berries) if (!b.alive && rand() < P.regrowProb) placeBerry(b);
+      for (const z of sim.zaps) z.life--;
+      sim.zaps = sim.zaps.filter((z) => z.life > 0);
+      sim.t++;
+      if (sim.t >= P.episodeLength) sim.endEpisode();
+    };
+
+    sim.endEpisode = function () {
+      const n = P.nAgents, L = P.episodeLength;
+      const others = [];
+      for (let c = 1; c < P.nColors; c++) if (!taboo.has(c)) others.push(c);
+      let qPink = 0, qOther = 0, sk = 0, vm = 0;
+      for (const a of agents) {
+        qPink += a.Q[POISON];
+        for (const c of others) qOther += a.Q[c] / others.length;
+        sk += skillOf(a, POISON);
+        vm += a.Vm;
+      }
+      sim.history.push({
+        episode: sim.episode,
+        collective: sim.ep.collective,
+        eaten: sim.ep.eaten, chaseSteps: sim.ep.chaseSteps,
+        poisoned: sim.ep.poisonedSteps / (n * L),
+        marked: sim.ep.markedSteps / (n * L),
+        tabooEaten: sim.ep.tabooEaten,
+        poisonEaten: sim.ep.poisonEaten,
+        sillyEaten: sim.ep.sillyEaten,
+        zapMarked: sim.ep.zapMarked,
+        zapUnmarked: sim.ep.zapUnmarked,
+        qPink: qPink / n, qOther: qOther / n, skill: sk / n, Vm: vm / n,
+        punishRate: sim.ep.tabooEaten ? sim.ep.zapMarked / sim.ep.tabooEaten : 0,
+        punishDelay: sim.ep.zapMarked ? sim.ep.punishDelay / sim.ep.zapMarked : 0,
+      });
+      sim.episode++;
+      resetEpisode();
+    };
+
+    sim.runEpisode = function () { const e = sim.episode; while (sim.episode === e) sim.step(); };
+
+    resetEpisode();
+    return sim;
+  }
+
+  const api = { createSim, DEFAULTS, TABOO, POISON };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.SillySim = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(() => {
+  const { createSim } = window.SillySim;
+  const CONDS = [
+    { key: 'none', name: 'No rules', rule: 'Nothing is taboo.', color: '--s-none' },
+    { key: 'important', name: 'Important rule', rule: 'Taboo: pink.', color: '--s-important' },
+    { key: 'silly', name: 'Silly rule', rule: 'Taboo: pink and teal.', color: '--s-silly' },
+  ];
+  const BERRY = ['#e87ba4', '#1baf7a', '#eda100', '#6250d6', '#3f9a3f', '#a0785a'];
+  const BERRY_NAME = ['pink (poison)', 'teal', 'yellow', 'violet', 'green', 'brown'];
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const $ = (id) => document.getElementById(id);
+
+  let sims = [], running = false, seed = 1, selected = null, view = 'live', expResult = null;
+  const CELL = 16;
+
+  function settings() {
+    return {
+      transferSkill: $('transfer').value === 'true',
+      zapCost: +$('zapCost').value,
+      poisonDelay: +$('delay').value,
+    };
+  }
+
+  // ---------- worlds ----------
+  const worldsEl = $('worlds');
+  CONDS.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'world';
+    d.innerHTML = `<h3><span class="swatch" style="background:var(${c.color})"></span>${c.name}</h3>
+      <p class="rule">${c.rule}</p><canvas id="cv${i}"></canvas><div class="wstats" id="ws${i}"></div>`;
+    worldsEl.appendChild(d);
+  });
+
+  function newRun() {
+    seed = (Math.random() * 1e9) | 0;
+    sims = CONDS.map((c) => createSim(c.key, seed, settings()));
+    selected = null;
+    sims.forEach((s, i) => {
+      const cv = $('cv' + i);
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = s.P.width * CELL * dpr; cv.height = s.P.height * CELL * dpr;
+      cv.style.aspectRatio = `${s.P.width} / ${s.P.height}`;
+      cv.onclick = (ev) => {
+        const r = cv.getBoundingClientRect();
+        const gx = (ev.clientX - r.left) / r.width * s.P.width;
+        const gy = (ev.clientY - r.top) / r.height * s.P.height;
+        let best = null, bd = 2.5;
+        for (const a of s.agents) { const d = Math.hypot(a.x + .5 - gx, a.y + .5 - gy); if (d < bd) { bd = d; best = a; } }
+        if (best) { selected = { sim: i, id: best.id }; drawInspector(); drawWorlds(); }
+        else if (!selected) $('inspector').innerHTML = '<p class="muted">No agent there. Click closer to one of the larger dark circles.</p>';
+      };
+    });
+    if (view === 'live') renderCharts();
+    drawWorlds(); drawInspector();
+  }
+
+  function drawWorlds() {
+    const bg = css('--world-bg'), agent = css('--agent'), sick = css('--agent-sick'), mark = css('--mark'), muted = css('--text-muted');
+    sims.forEach((s, i) => {
+      const cv = $('cv' + i), g = cv.getContext('2d');
+      const k = cv.width / s.P.width;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = bg; g.fillRect(0, 0, cv.width, cv.height);
+      for (const b of s.berries) {
+        if (!b.alive) continue;
+        g.fillStyle = BERRY[b.color];
+        g.beginPath(); g.arc((b.x + .5) * k, (b.y + .5) * k, k * .2, 0, 7); g.fill();
+      }
+      // chase lines
+      g.setLineDash([k * .15, k * .2]); g.lineWidth = Math.max(1, k * .06); g.strokeStyle = muted;
+      for (const a of s.agents) if (a.mode === 'chase' && a.target) {
+        g.beginPath(); g.moveTo((a.x + .5) * k, (a.y + .5) * k); g.lineTo((a.target.x + .5) * k, (a.target.y + .5) * k); g.stroke();
+      }
+      g.setLineDash([]);
+      for (const z of s.zaps) {
+        g.globalAlpha = z.life / 6; g.strokeStyle = mark; g.lineWidth = k * .14;
+        g.beginPath(); g.moveTo((z.x1 + .5) * k, (z.y1 + .5) * k); g.lineTo((z.x2 + .5) * k, (z.y2 + .5) * k); g.stroke();
+      }
+      g.globalAlpha = 1;
+      for (const a of s.agents) {
+        const cx = (a.x + .5) * k, cy = (a.y + .5) * k;
+        g.fillStyle = a.poisoned ? sick : agent;
+        g.beginPath(); g.arc(cx, cy, k * .34, 0, 7); g.fill();
+        if (a.marked) { g.strokeStyle = mark; g.lineWidth = k * .13; g.stroke(); }
+        if (selected && selected.sim === i && selected.id === a.id) {
+          g.strokeStyle = css('--accent'); g.lineWidth = k * .16;
+          g.beginPath(); g.arc(cx, cy, k * .62, 0, 7); g.stroke();
+        }
+      }
+      const h = s.history, last = h[h.length - 1];
+      $('ws' + i).textContent = `Episode ${s.episode + 1}, step ${s.t}` +
+        (last ? ` · last episode: return ${Math.round(last.collective)}, poisoned ${(last.poisoned * 100).toFixed(0)}%` : '');
+    });
+  }
+
+  // ---------- inspector ----------
+  function drawInspector() {
+    const el = $('inspector');
+    if (!selected || !sims[selected.sim]) { el.innerHTML = '<p class="muted">Click an agent in any world.</p>'; return; }
+    const s = sims[selected.sim], a = s.agents[selected.id];
+    const lo = -12, hi = 5, pct = (v) => (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * 100, z = pct(0);
+    let rows = '';
+    a.Q.forEach((q, c) => {
+      const p = pct(q), left = Math.min(p, z), w = Math.abs(p - z);
+      const taboo = s.taboo.has(c) ? ' <span class="muted">(taboo)</span>' : '';
+      rows += `<span>${BERRY_NAME[c]}${taboo}</span><div class="bar-track"><div class="bar-zero" style="left:${z}%"></div>
+        <div class="bar-fill" style="left:${left}%;width:${w}%;background:${BERRY[c]}"></div></div><span class="num">${q.toFixed(1)}</span>`;
+    });
+    const sk = s.skillOf(a, 0);
+    el.innerHTML = `<p style="margin:0 0 10px" class="note">Agent ${a.id + 1} in <b>${CONDS[selected.sim].name}</b>.
+      ${a.poisoned ? 'Currently poisoned (it can’t tell).' : ''} ${a.marked ? 'Currently marked (it can’t see this).' : ''}</p>
+      <div><p style="margin:0 0 6px;font-weight:600;font-size:13.5px">Compliance: how good it thinks each berry is</p>
+      <div class="bars">${rows}</div>
+      <p class="note muted" style="margin:6px 0 14px">One number <em>per berry</em>. Learning to avoid pink teaches nothing about teal, so compliance is norm-specific.</p></div><div>
+      <p style="margin:0 0 6px;font-weight:600;font-size:13.5px">Enforcement: one skill for all norms${s.P.transferSkill ? '' : ' <span class="muted">(currently split by norm)</span>'}</p>
+      <div class="bars">
+        <span>skill (pink)</span><div class="bar-track"><div class="bar-fill" style="left:0;width:${sk * 100}%;background:var(--accent)"></div></div><span class="num">${sk.toFixed(2)}</span>
+        <span>chase marked</span><div class="bar-track"><div class="bar-zero" style="left:50%"></div><div class="bar-fill" style="left:${Math.min(50, 50 + a.Vm * 2.5)}%;width:${Math.min(50, Math.abs(a.Vm) * 2.5)}%;background:var(--accent)"></div></div><span class="num">${a.Vm.toFixed(1)}</span>
+        <span>chase innocent</span><div class="bar-track"><div class="bar-zero" style="left:50%"></div><div class="bar-fill" style="left:${Math.min(50, 50 + a.Vu * 2.5)}%;width:${Math.min(50, Math.abs(a.Vu) * 2.5)}%;background:var(--text-muted)"></div></div><span class="num">${a.Vu.toFixed(1)}</span>
+      </div>
+      <p class="note muted" style="margin:6px 0 0">Skill grows with practice: each attempt to punish a marked agent counts, whichever rule they broke. That is why extra taboos mean extra practice.</p></div>`;
+  }
+
+  // ---------- charts ----------
+  const METRICS = [
+    { k: 'collective', t: 'Group return', s: 'Total points per episode, net of punishment costs', fmt: (v) => Math.round(v) },
+    { k: 'poisoned', t: 'Time spent poisoned', s: 'Share of agent-steps', fmt: (v) => (v * 100).toFixed(0) + '%', pct: true },
+    { k: 'zapMarked', t: 'Violators punished', s: 'Per episode', fmt: (v) => v.toFixed(1) },
+    { k: 'tabooEaten', t: 'Taboo berries eaten', s: 'Pink, plus teal if taboo', fmt: (v) => v.toFixed(1) },
+    { k: 'skill', t: 'Enforcement skill', s: 'Average across agents (0 to 1)', fmt: (v) => v.toFixed(2) },
+    { k: 'zapUnmarked', t: 'Innocent agents zapped', s: 'Per episode (mistakes)', fmt: (v) => v.toFixed(1) },
+  ];
+  const chartsEl = $('charts');
+  METRICS.forEach((m, i) => {
+    const d = document.createElement('div');
+    d.className = 'chart';
+    d.innerHTML = `<p class="ct">${m.t}</p><p class="cs">${m.s}</p><svg id="ch${i}" viewBox="0 0 340 190"></svg><div class="tip" id="tip${i}"></div>`;
+    chartsEl.appendChild(d);
+  });
+  $('legend').innerHTML = CONDS.map((c) => `<span><i style="background:var(${c.color})"></i>${c.name}</span>`).join('');
+
+  function movingAvg(arr, w) {
+    return arr.map((_, i) => { let s = 0, n = 0; for (let j = Math.max(0, i - w + 1); j <= i; j++) { s += arr[j]; n++; } return s / n; });
+  }
+
+  function seriesFor(m) {
+    if (view === 'exp' && expResult) {
+      return CONDS.map((c, ci) => ({ color: css(c.color), name: c.name, ...expResult[ci][m.k] }));
+    }
+    return CONDS.map((c, ci) => {
+      const raw = (sims[ci] ? sims[ci].history : []).map((h) => h[m.k]);
+      return { color: css(c.color), name: c.name, mean: movingAvg(raw, 5) };
+    });
+  }
+
+  const W = 340, H = 190, ML = 44, MR = 70, MT = 8, MB = 26;
+  function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+
+  function renderCharts() {
+    const grid = css('--grid'), muted = css('--text-muted'), sec = css('--text-secondary'), surf = css('--surface-1');
+    METRICS.forEach((m, i) => {
+      const svg = $('ch' + i), ser = seriesFor(m);
+      const n = Math.max(1, ...ser.map((s) => s.mean.length));
+      let ymax = 0, ymin = 0;
+      for (const s of ser) for (let j = 0; j < s.mean.length; j++) { ymax = Math.max(ymax, s.hi ? s.hi[j] : s.mean[j]); ymin = Math.min(ymin, s.lo ? s.lo[j] : s.mean[j]); }
+      if (m.pct) ymax = 1;
+      ymax = niceMax(ymax); if (ymin < 0) ymin = -niceMax(-ymin);
+      const X = (j) => ML + (n <= 1 ? 0 : j / (n - 1)) * (W - ML - MR);
+      const Y = (v) => MT + (1 - (v - ymin) / (ymax - ymin)) * (H - MT - MB);
+      let out = '';
+      for (let t = 0; t <= 4; t++) {
+        const v = ymin + (ymax - ymin) * t / 4, y = Y(v);
+        out += `<line x1="${ML}" x2="${W - MR}" y1="${y}" y2="${y}" stroke="${grid}" stroke-width="1"/>`;
+        out += `<text x="${ML - 6}" y="${y + 4}" text-anchor="end" font-size="10.5" fill="${muted}">${m.pct ? Math.round(v * 100) + '%' : (Math.abs(v) >= 1000 ? (v / 1000) + 'k' : +v.toFixed(2))}</text>`;
+      }
+      if (ymin < 0) out += `<line x1="${ML}" x2="${W - MR}" y1="${Y(0)}" y2="${Y(0)}" stroke="${muted}" stroke-width="1"/>`;
+      out += `<text x="${(ML + W - MR) / 2}" y="${H - 4}" text-anchor="middle" font-size="10.5" fill="${muted}">episode</text>`;
+      out += `<text x="${ML}" y="${H - 14}" font-size="10" fill="${muted}">1</text><text x="${W - MR}" y="${H - 14}" text-anchor="end" font-size="10" fill="${muted}">${n}</text>`;
+      // bands then lines
+      for (const s of ser) if (s.lo && s.mean.length > 1) {
+        let d = s.hi.map((v, j) => `${j ? 'L' : 'M'}${X(j)},${Y(v)}`).join('');
+        d += s.lo.map((v, j) => `L${X(s.lo.length - 1 - j)},${Y(s.lo[s.lo.length - 1 - j])}`).join('') + 'Z';
+        out += `<path d="${d}" fill="${s.color}" opacity="0.16"/>`;
+      }
+      const ends = [];
+      for (const s of ser) if (s.mean.length) {
+        const d = s.mean.map((v, j) => `${j ? 'L' : 'M'}${X(j)},${Y(v)}`).join('');
+        out += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+        ends.push({ y: Y(s.mean[s.mean.length - 1]), name: s.name.split(' ')[0] === 'No' ? 'No rules' : s.name.split(' ')[0], color: s.color });
+      }
+      // direct labels, nudged apart
+      ends.sort((a, b) => a.y - b.y);
+      for (let j = 1; j < ends.length; j++) if (ends[j].y - ends[j - 1].y < 12) ends[j].y = ends[j - 1].y + 12;
+      for (const e of ends) out += `<text x="${W - MR + 6}" y="${e.y + 4}" font-size="10.5" fill="${sec}">${e.name}</text>`;
+      out += `<line id="xh${i}" x1="0" x2="0" y1="${MT}" y2="${H - MB}" stroke="${muted}" stroke-width="1" visibility="hidden"/>`;
+      out += `<rect x="${ML}" y="${MT}" width="${W - ML - MR}" height="${H - MT - MB}" fill="transparent" id="hit${i}"/>`;
+      svg.innerHTML = out;
+      const hit = $('hit' + i), tip = $('tip' + i), xh = $('xh' + i);
+      hit.onmousemove = (ev) => {
+        const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) / r.width * W;
+        const j = Math.max(0, Math.min(n - 1, Math.round((sx - ML) / (W - ML - MR) * (n - 1))));
+        xh.setAttribute('x1', X(j)); xh.setAttribute('x2', X(j)); xh.setAttribute('visibility', 'visible');
+        tip.innerHTML = `<b>Episode ${j + 1}</b><br>` + ser.map((s) => s.mean[j] === undefined ? '' :
+          `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color};margin-right:5px"></span>${s.name}: ${m.fmt(s.mean[j])}${s.se ? ' ± ' + m.fmt(s.se[j]) : ''}`).join('<br>');
+        tip.style.display = 'block';
+        const px = X(j) / W * r.width;
+        tip.style.left = (px > r.width / 2 ? px - tip.offsetWidth - 10 : px + 10) + 'px';
+        tip.style.top = (svg.offsetTop + 10) + 'px';
+      };
+      hit.onmouseleave = () => { tip.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); };
+    });
+  }
+
+  // ---------- live loop ----------
+  let lastEpisodes = 0;
+  function frame() {
+    if (running) {
+      const sp = +$('speed').value;
+      if (sp === 0) {
+        const t0 = performance.now();
+        while (performance.now() - t0 < 30) for (const s of sims) s.step();
+      } else {
+        for (let k = 0; k < sp; k++) for (const s of sims) s.step();
+      }
+      drawWorlds();
+      if (selected) drawInspector();
+      if (sims[0].episode !== lastEpisodes) { lastEpisodes = sims[0].episode; if (view === 'live') renderCharts(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  $('play').onclick = () => { running = !running; $('play').textContent = running ? '❚❚ Pause' : '▶ Play'; };
+  $('reset').onclick = () => { lastEpisodes = 0; newRun(); };
+  for (const id of ['transfer', 'zapCost', 'delay']) {
+    $(id).oninput = () => { $('zapCostOut').textContent = $('zapCost').value; $('delayOut').textContent = $('delay').value; };
+    $(id).onchange = () => { lastEpisodes = 0; newRun(); };
+  }
+
+  // ---------- batch experiment ----------
+  const EXP_EPS = 30;
+  $('experiment').onclick = () => {
+    const nPop = +$('nPop').value, opts = settings();
+    const jobs = [];
+    CONDS.forEach((c, ci) => { for (let p = 0; p < nPop; p++) jobs.push({ ci, sim: createSim(c.key, 100 + p, opts) }); });
+    const total = jobs.length * EXP_EPS;
+    let done = 0, jobIdx = 0;
+    $('experiment').disabled = true; $('progress').style.display = 'block';
+    const wasRunning = running; running = false; $('play').textContent = '▶ Play';
+    function chunk() {
+      const t0 = performance.now();
+      while (jobIdx < jobs.length && performance.now() - t0 < 40) {
+        const j = jobs[jobIdx];
+        j.sim.runEpisode(); done++;
+        if (j.sim.episode >= EXP_EPS) jobIdx++;
+      }
+      $('progress').firstElementChild.style.width = (done / total * 100) + '%';
+      if (jobIdx < jobs.length) { setTimeout(chunk, 0); return; }
+      expResult = CONDS.map((_, ci) => {
+        const hs = jobs.filter((j) => j.ci === ci).map((j) => j.sim.history);
+        const o = {};
+        for (const m of METRICS) {
+          const mean = [], se = [], lo = [], hi = [];
+          for (let e = 0; e < EXP_EPS; e++) {
+            const vals = hs.map((h) => {
+              // light 3-episode smoothing within each population
+              let s = 0, n = 0; for (let q = Math.max(0, e - 2); q <= e; q++) { s += h[q][m.k]; n++; } return s / n;
+            });
+            const mu = vals.reduce((a, b) => a + b, 0) / vals.length;
+            const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mu) ** 2, 0) / Math.max(1, vals.length - 1));
+            const s = sd / Math.sqrt(vals.length);
+            mean.push(mu); se.push(s); lo.push(mu - s); hi.push(mu + s);
+          }
+          o[m.k] = { mean, se, lo, hi };
+        }
+        return o;
+      });
+      view = 'exp';
+      $('modeLabel').textContent = `(experiment: mean of ${nPop} populations per rule, band = ±1 standard error)`;
+      $('expNote').style.display = 'block';
+      $('expNote').textContent = `Settings: enforcement skill ${opts.transferSkill ? 'shared across norms' : 'separate for each norm'}, punishing costs ${opts.zapCost}, poison delay ${opts.poisonDelay} steps. Each population learns from scratch for ${EXP_EPS} episodes of 1,000 steps. Hover a chart for values.`;
+      $('experiment').disabled = false; $('progress').style.display = 'none'; $('showLive').style.display = 'inline-block';
+      renderCharts();
+      if (wasRunning) { running = true; $('play').textContent = '❚❚ Pause'; }
+    }
+    chunk();
+  };
+  $('showLive').onclick = () => {
+    view = 'live'; $('showLive').style.display = 'none'; $('expNote').style.display = 'none';
+    $('modeLabel').textContent = '(this run, 5-episode moving average)'; renderCharts();
+  };
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { renderCharts(); drawWorlds(); });
+  newRun();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
